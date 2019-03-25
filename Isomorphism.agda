@@ -2,8 +2,12 @@
 
 module Isomorphism where
 
+open import Empty using (⊥)
 open import Equality using (_≡_); open Equality._≡_
-open import Functions using (id ; _∘_)
+open import Functions using (id ; _∘_ ; _$_)
+open import List using (List ; _++_); open List.List
+open import Membership using (_∈_)
+open import Sum using (_+_); open Sum._+_
 
 infixr 1 _≅_
 
@@ -47,3 +51,71 @@ infixr 1 _∎
 
 _∎ : (A : Set) → A ≅ A
 _ ∎ = ≅-reflexive
+
++-cong-left : ∀ {X X' Y : Set} → X ≅ X' → (X + Y) ≅ (X' + Y)
+_≅_.to (+-cong-left i) (left x) = left $ _≅_.to i x
+_≅_.to (+-cong-left i) (right x) = right x
+_≅_.from (+-cong-left i) (left x) = left $ _≅_.from i x
+_≅_.from (+-cong-left i) (right y) = right y
+_≅_.to-from (+-cong-left i) {left x} rewrite _≅_.to-from i {x} = refl
+_≅_.to-from (+-cong-left i) {right x} = refl
+_≅_.from-to (+-cong-left i) {left x} rewrite _≅_.from-to i {x} = refl
+_≅_.from-to (+-cong-left i) {right x} = refl
+
++-cong-right : ∀ {X Y Y' : Set} → Y ≅ Y' → (X + Y) ≅ (X + Y')
+_≅_.to (+-cong-right i) (left x) = left x
+_≅_.to (+-cong-right i) (right x) = right $ _≅_.to i x
+_≅_.from (+-cong-right i) (left x) = left x
+_≅_.from (+-cong-right i) (right x) = right $ _≅_.from i x
+_≅_.to-from (+-cong-right i) {left x} = refl
+_≅_.to-from (+-cong-right i) {right x} rewrite _≅_.to-from i {x} = refl
+_≅_.from-to (+-cong-right i) {left x} = refl
+_≅_.from-to (+-cong-right i) {right x} rewrite _≅_.from-to i {x} = refl
+
++-cong : ∀ {X X' Y Y' : Set} → X ≅ X' → Y ≅ Y' → (X + Y) ≅ (X' + Y')
++-cong i₁ i₂ = ≅-transitive (+-cong-left i₁) (+-cong-right i₂)
+
++-comm : ∀ {X Y : Set} → (X + Y) ≅ (Y + X)
+_≅_.to +-comm (left x) = right x
+_≅_.to +-comm (right x) = left x
+_≅_.from +-comm (left x) = right x
+_≅_.from +-comm (right x) = left x
+_≅_.to-from +-comm {left x} = refl
+_≅_.to-from +-comm {right x} = refl
+_≅_.from-to +-comm {left x} = refl
+_≅_.from-to +-comm {right x} = refl
+
++-assoc : ∀ {X Y Z : Set} → (X + (Y + Z)) ≅ ((X + Y) + Z)
+_≅_.to +-assoc (left x) = left (left x)
+_≅_.to +-assoc (right (left y)) = left (right y)
+_≅_.to +-assoc (right (right z)) = right z
+_≅_.from +-assoc (left (left x)) = left x
+_≅_.from +-assoc (left (right y)) = right (left y)
+_≅_.from +-assoc (right z) = right (right z)
+_≅_.to-from +-assoc {left (left x)} = refl
+_≅_.to-from +-assoc {left (right y)} = refl
+_≅_.to-from +-assoc {right z} = refl
+_≅_.from-to +-assoc {left x} = refl
+_≅_.from-to +-assoc {right (left y)} = refl
+_≅_.from-to +-assoc {right (right z)} = refl
+
+⊥-left-unit : ∀ {X : Set} → X ≅ ⊥ + X
+_≅_.to ⊥-left-unit = right
+_≅_.from ⊥-left-unit (left ())
+_≅_.from ⊥-left-unit (right x) = x
+_≅_.to-from ⊥-left-unit {left ()}
+_≅_.to-from ⊥-left-unit {right x} = refl
+_≅_.from-to ⊥-left-unit {x} = refl
+
+∈-distr-++ : ∀ {A : Set} {x : A} {as₁ as₂ : List A} → (x ∈ (as₁ ++ as₂)) ≅ (x ∈ as₁ + x ∈ as₂)
+∈-distr-++ {A} {x} {[]} {as₂} =
+  x ∈ ([] ++ as₂)    ≅⟨ ≅-reflexive ⟩
+  x ∈ as₂            ≅⟨ ⊥-left-unit ⟩
+  ⊥ + x ∈ as₂        ≅⟨ ≅-reflexive ⟩
+  (x ∈ [] + x ∈ as₂) ∎
+∈-distr-++ {A} {x} {a :: as₁} {as₂} =
+  x ∈ (a :: as₁ ++ as₂)         ≅⟨ ≅-reflexive ⟩
+  a ≡ x + x ∈ (as₁ ++ as₂)      ≅⟨ +-cong-right ∈-distr-++ ⟩
+  a ≡ x + x ∈ as₁ + x ∈ as₂     ≅⟨ +-assoc  ⟩
+  (a ≡ x + x ∈ as₁) + x ∈ as₂   ≅⟨ ≅-reflexive ⟩
+  (x ∈ (a :: as₁) + x ∈ as₂)    ∎
