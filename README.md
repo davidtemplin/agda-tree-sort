@@ -1,2 +1,3 @@
 # agda-tree-sort
-Agda Tree Sort
+
+This repository contains a full proof of the correctness of an implementation of a tree sort algorithm.
