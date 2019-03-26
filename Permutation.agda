@@ -4,11 +4,13 @@ module Permutation (A : Set) where
 
 open import Any using (AnyT); open Any.AnyT ⦃...⦄
 open import Empty using (⊥ ; ⊥-elim)
-open import Equality using (_≡_); open Equality._≡_
+open import Equality using (_≡_ ; _≡⟨_⟩_) renaming (_∎ to _∎-eq); open Equality._≡_
+open import Fin using (Fin); open Fin.Fin
 open import Functions using (_$_)
-open import Isomorphism using (_≅_ ; _≅⟨_⟩_ ; _∎ ; ≅-reflexive ; ≅-symmetric ; ⊥-left-unit ; +-cong-left ; +-cong-right ; ∈-distr-++ ; +-assoc ; +-comm)
-open import List using (List ; _++_); open List.List
+open import Isomorphism using (_≅_ ; _≅⟨_⟩_ ; _∎ ; ≅-reflexive ; ≅-symmetric ; ⊥-left-unit ; +-cong-left ; +-cong-right ; ∈-distr-++ ; +-assoc ; +-comm ; iso)
+open import List using (List ; _++_ ; length ; lookup); open List.List
 open import Membership using (_∈_)
+open import Product using (∃ ; ⟨_,_⟩)
 open import Sum using (_+_); open Sum._+_
 open import Tree using (Tree); open Tree.Tree
 
@@ -78,3 +80,47 @@ swap-lemma {a₁} {a₂} {as} {x} =
   (a₂ ≡ x + a₁ ≡ x) + x ∈ as ≅⟨ ≅-symmetric +-assoc ⟩
   a₂ ≡ x + a₁ ≡ x + x ∈ as   ≅⟨ ≅-reflexive ⟩
   x ∈ a₂ :: a₁ :: as         ∎
+
+∃-cong : ∀ {as₁ as₂ : List A} → as₁ ≈ as₂ → ∃ A (λ a → a ∈ as₁) ≅ ∃ A (λ a → a ∈ as₂)
+_≅_.to (∃-cong {as₁} {as₂} p) ⟨ a , x ⟩ = ⟨ a , _≅_.to p x ⟩
+_≅_.from (∃-cong {as₁} {as₂} p) ⟨ a , x ⟩ = ⟨ a , _≅_.from p x ⟩
+_≅_.to-from (∃-cong {as₁} {as₂} p) {⟨ a , x ⟩} rewrite _≅_.to-from p {x} = refl
+_≅_.from-to (∃-cong {as₁} {as₂} p) {⟨ a , x ⟩} rewrite _≅_.from-to p {x} = refl
+
+sound-iso : ∀ {as₁ as₂ : List A} → as₁ ≈ as₂ → Fin (length as₁) ≅ Fin (length as₂)
+sound-iso {as₁} {as₂} p =
+  Fin (length as₁)    ≅⟨ iso ⟩
+  ∃ A (λ a → a ∈ as₁) ≅⟨ ∃-cong p ⟩
+  ∃ A (λ a → a ∈ as₂) ≅⟨ ≅-symmetric iso ⟩
+  Fin (length as₂)    ∎
+
+lookup' : (as : List A) → ∃ A (λ a → a ∈ as) → A
+lookup' [] ()
+lookup' (_ :: _) ⟨ a , left _ ⟩ = a
+lookup' (_ :: as) ⟨ a , right p ⟩ = lookup' as ⟨ a , p ⟩
+
+lookup-eq : ∀ {as : List A} {i : Fin (length as)} → lookup as i ≡ lookup' as (_≅_.to iso i)
+lookup-eq {[]} {()}
+lookup-eq {a :: as} {fzero} = refl
+lookup-eq {a :: as} {fsucc i} rewrite lookup-eq {as} {i} = refl
+
+lookup-eq-2 : ∀ {as : List A} {e : ∃ A (λ a → a ∈ as)} → lookup' as e ≡ lookup as (_≅_.from iso e)
+lookup-eq-2 {[]} {()}
+lookup-eq-2 {_ :: _} {⟨ _ , left refl ⟩} = refl
+lookup-eq-2 {_ :: as} {⟨ a , right x ⟩} rewrite lookup-eq-2 {as} {⟨ a , x ⟩} = refl
+
+lemma : ∀ {a : A} {as : List A} {p : a ∈ as} → lookup' as ⟨ a , p ⟩ ≡ a
+lemma {a} {[]} {()}
+lemma {a} {a' :: as} {left refl} = refl
+lemma {a} {a' :: as} {right x} = lemma {a} {as} {x}
+
+lookup'-eq : ∀ {as₁ as₂ : List A} {e : ∃ A (λ a → a ∈ as₁)} → (p : as₁ ≈ as₂) → lookup' as₁ e ≡ lookup' as₂ (_≅_.to (∃-cong p) e)
+lookup'-eq {as₁} {as₂} {⟨ a , x ⟩} p rewrite lemma {a} {as₁} {x} | lemma {a} {as₂} {_≅_.to p x} = refl
+
+lookup-match : ∀ {as₁ as₂ : List A} {i : Fin (length as₁)} → (p : as₁ ≈ as₂) → lookup as₁ i ≡ lookup as₂ (_≅_.to (sound-iso p) i)
+lookup-match {as₁} {as₂} {i} p =
+  lookup as₁ i                                                 ≡⟨ lookup-eq {as₁} ⟩
+  lookup' as₁ (_≅_.to iso i)                                   ≡⟨ lookup'-eq p ⟩
+  lookup' as₂ (_≅_.to (∃-cong p) $ _≅_.to iso i)               ≡⟨ lookup-eq-2 {as₂}  ⟩
+  lookup as₂ (_≅_.from iso $ _≅_.to (∃-cong p) $ _≅_.to iso i) ≡⟨ refl ⟩
+  lookup as₂ (_≅_.to (sound-iso p) i)                          ∎-eq

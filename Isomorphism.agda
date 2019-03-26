@@ -4,9 +4,11 @@ module Isomorphism where
 
 open import Empty using (⊥)
 open import Equality using (_≡_); open Equality._≡_
+open import Fin using (Fin); open Fin.Fin
 open import Functions using (id ; _∘_ ; _$_)
-open import List using (List ; _++_); open List.List
+open import List using (List ; _++_ ; length); open List.List
 open import Membership using (_∈_)
+open import Product using (∃ ; ⟨_,_⟩); open Product.∃
 open import Sum using (_+_); open Sum._+_
 
 infixr 1 _≅_
@@ -119,3 +121,17 @@ _≅_.from-to ⊥-left-unit {x} = refl
   a ≡ x + x ∈ as₁ + x ∈ as₂     ≅⟨ +-assoc  ⟩
   (a ≡ x + x ∈ as₁) + x ∈ as₂   ≅⟨ ≅-reflexive ⟩
   (x ∈ (a :: as₁) + x ∈ as₂)    ∎
+
+iso : ∀ {A : Set} {as : List A} → Fin (length as) ≅ ∃ A (λ a → a ∈ as)
+_≅_.to (iso {A} {[]}) ()
+_≅_.to (iso {A} {a :: _}) fzero = ⟨ a , left refl ⟩
+_≅_.to (iso {A} {_ :: _}) (fsucc i) = let r = _≅_.to iso i in ⟨ proj₁ r , right (proj₂ r) ⟩
+_≅_.from (iso {A} {[]}) ()
+_≅_.from (iso {A} {_ :: _}) ⟨ _ , left _ ⟩ = fzero
+_≅_.from (iso {A} {_ :: _}) ⟨ a' , right x ⟩ = fsucc (_≅_.from iso ⟨ a' , x ⟩)
+_≅_.to-from (iso {A} {[]}) {()}
+_≅_.to-from (iso {A} {_ :: _}) {⟨ _ , left refl ⟩} = refl
+_≅_.to-from (iso {A} {_ :: _}) {⟨ a' , right x ⟩} rewrite (_≅_.to-from iso) {⟨ a' , x ⟩} = refl
+_≅_.from-to (iso {A} {[]}) {()}
+_≅_.from-to (iso {A} {_ :: _}) {fzero} = refl
+_≅_.from-to (iso {A} {_ :: _}) {fsucc i} rewrite (_≅_.from-to iso) {i} = refl
