@@ -2,16 +2,16 @@
 
 open import Bool using (Bool); open Bool.Bool
 open import Equality using (_≡_ ; _≢_ ; ≡-symmetric ; ≡-transitive)
-open import Implication using (_→⟨_⟩_ ; _∎ ; _↔_)
+open import Implication using (_→⟨_⟩_ ; _∎ ; _↔_ ; ×-cong ; ×-assoc ; ⊤-left ; ⊤-right)
+open import Relation using (TotalOrder ; total-order-reflexive ; CharacteristicFunction)
 open import Sum using (_+_); open Sum._+_
 
 module Proofs2
   (A : Set)
   (_≤_ : A → A → Set)
   (_≤?_ : A → A → Bool)
-  (reflection : ∀ {a₁ a₂ : A} → (a₁ ≤? a₂ ≡ true) ↔ a₁ ≤ a₂)
-  (≤-total : ∀ {a₁ a₂ : A} → ((a₁ ≤ a₂) + (a₂ ≤ a₁)))
-  (≤-transitive : ∀ {a₁ a₂ a₃ : A} → a₁ ≤ a₂ → a₂ ≤ a₃ → a₁ ≤ a₃) where
+  (≤?-characteristic-function : CharacteristicFunction _≤_ _≤?_)
+  (≤-total-order : TotalOrder _≤_) where
 
 open import Empty using (⊥ ; ⊥-elim)
 open import Fin renaming (_≤_ to _≤-Fin_)
@@ -20,50 +20,13 @@ open import Inspect using (inspect ; [_])
 open import List using (List ; _++_ ; length ; lookup); open List.List
 
 open import Product using (_×_ ; ⟨_,_⟩); open Product.∃
-import Sorted; module S = Sorted A _≤_; open S using (SortedT ; A⁺ ; -∞ ; ∞ ; ⟦_⟧ ; _≤⁺⟦_⟧≤⁺_ ; _≤⁺_) ; open S.SortedT ⦃...⦄ ; open S._≤⁺_
+import Sorted; module S = Sorted A _≤_ ≤-total-order; open S using (SortedT ; A⁺ ; -∞ ; ∞ ; ⟦_⟧ ; _≤⁺⟦_⟧≤⁺_ ; _≤⁺_ ; -∞≤⁺⟦a⟧≤⁺∞ ; weaken-low ; strengthen-low ; weaken-high ; ≤⁺-total-order) ; open S.SortedT ⦃...⦄ ; open S._≤⁺_
 open import Tree using (Tree); open Tree.Tree
 open import TreeSort A _≤?_ using (tree-sort ; to-search-tree ; insert ; flatten)
 open import Unit using (⊤)
 
-×-cong : ∀ {X Y X' Y' : Set} → (X → X') → (Y → Y') → (X × Y) → (X' × Y')
-×-cong f g ⟨ x , y ⟩ = ⟨ f x , g y ⟩
-
-×-assoc : ∀ {X Y Z : Set} → (X × Y) × Z → X × (Y × Z)
-×-assoc ⟨ ⟨ x , y ⟩ , z ⟩ = ⟨ x , ⟨ y , z ⟩ ⟩
-
--∞≤⁺⟦a⟧≤⁺∞ : ∀ {a : A} → -∞ ≤⁺⟦ a ⟧≤⁺ ∞
--∞≤⁺⟦a⟧≤⁺∞ = ⟨ -∞-min , ∞-max ⟩
-
-≤-reflexive : ∀ {a : A} → a ≤ a
-≤-reflexive {a} with ≤-total {a} {a}
-... | left a≤a  = a≤a
-... | right a≤a = a≤a
-
-≤⁺-transitive : ∀ {e₁ e₂ e₃ : A⁺} → e₁ ≤⁺ e₂ → e₂ ≤⁺ e₃ → e₁ ≤⁺ e₃
-≤⁺-transitive {.-∞} {_} {_} -∞-min _ = -∞-min
-≤⁺-transitive {_} {.∞} {.∞} ∞-max ∞-max = ∞-max
-≤⁺-transitive {.(⟦ _ ⟧)} {.(⟦ _ ⟧)} {.∞} (≤⁺-lift _) ∞-max = ∞-max
-≤⁺-transitive {.(⟦ _ ⟧)} {.(⟦ _ ⟧)} {.(⟦ _ ⟧)} (≤⁺-lift x₁) (≤⁺-lift x₂) = ≤⁺-lift $ ≤-transitive x₁ x₂
-
-weaken-low' : ∀ {low₁ low₂ high : A⁺} {a : A} → low₂ ≤⁺ low₁ → low₁ ≤⁺⟦ a ⟧≤⁺ high → low₂ ≤⁺⟦ a ⟧≤⁺ high
-weaken-low' {low₁} {low₂} {high} {a} low₂≤⁺low₁ ⟨ low₁≤⁺⟦a⟧ , ⟦a⟧≤⁺high ⟩ = ⟨ ≤⁺-transitive low₂≤⁺low₁ low₁≤⁺⟦a⟧ , ⟦a⟧≤⁺high ⟩
-
-weaken-low : ∀ {low₁ low₂ high : A⁺} {as : List A} → low₂ ≤⁺ low₁ → Sorted low₁ high as → Sorted low₂ high as
-weaken-low {low₁} {low₂} {high} {[]} low₂≤⁺low₁ s = ⊤.*
-weaken-low {low₁} {low₂} {high} {a :: as} low₂≤⁺low₁ =
-  Sorted low₁ high (a :: as)                 →⟨ id ⟩
-  low₁ ≤⁺⟦ a ⟧≤⁺ high × Sorted ⟦ a ⟧ high as →⟨ ×-cong (weaken-low' low₂≤⁺low₁) id ⟩
-  low₂ ≤⁺⟦ a ⟧≤⁺ high × Sorted ⟦ a ⟧ high as →⟨ id ⟩
-  Sorted low₂ high (a :: as)                 ∎
-
-strengthen-low : ∀ {low high : A⁺} {a : A} → low ≤⁺⟦ a ⟧≤⁺ high → ⟦ a ⟧ ≤⁺⟦ a ⟧≤⁺ high
-strengthen-low ⟨ _ , ⟦a⟧≤⁺high ⟩ = ⟨ ≤⁺-lift ≤-reflexive , ⟦a⟧≤⁺high ⟩
-
-weaken-high : ∀ {low high₁ high₂ : A⁺} {a : A} → high₁ ≤⁺ high₂ → low ≤⁺⟦ a ⟧≤⁺ high₁ → low ≤⁺⟦ a ⟧≤⁺ high₂
-weaken-high high₁≤⁺high₂ ⟨ low≤⁺⟦a⟧ , ⟦a⟧≤⁺high₁ ⟩ = ⟨ low≤⁺⟦a⟧ , ≤⁺-transitive ⟦a⟧≤⁺high₁ high₁≤⁺high₂ ⟩
-
 Sorted-++ : ∀ {low₁ high₁ low₂ high₂ : A⁺} {as₁ as₂ : List A} → low₁ ≤⁺ high₁ → high₁ ≤⁺ low₂ → low₂ ≤⁺ high₂ → Sorted low₁ high₁ as₁ → Sorted low₂ high₂ as₂ → Sorted low₁ high₂ (as₁ ++ as₂)
-Sorted-++ {low₁} {high₁} {low₂} {high₂} {[]} {as₂} low₁≤⁺high₁ high₁≤⁺low₂ low₂≤⁺high₂ s₁ s₂ = weaken-low (≤⁺-transitive low₁≤⁺high₁ high₁≤⁺low₂) s₂
+Sorted-++ {low₁} {high₁} {low₂} {high₂} {[]} {as₂} low₁≤⁺high₁ high₁≤⁺low₂ low₂≤⁺high₂ s₁ s₂ = weaken-low (TotalOrder.transitive ≤⁺-total-order low₁≤⁺high₁ high₁≤⁺low₂) s₂
 Sorted-++ {low₁} {high₁} {low₂} {high₂} {a :: as₁} {as₂} low₁≤⁺high₁ high₁≤⁺low₂ low₂≤⁺high₂ s₁ s₂ = ⟨ s₁ , s₂ ⟩ &
   Sorted low₁ high₁ (a :: as₁) × Sorted low₂ high₂ as₂                    →⟨ id ⟩
   (low₁ ≤⁺⟦ a ⟧≤⁺ high₁ × Sorted ⟦ a ⟧ high₁ as₁) × Sorted low₂ high₂ as₂ →⟨ ×-assoc ⟩
@@ -77,14 +40,14 @@ Sorted-++ {low₁} {high₁} {low₂} {high₂} {a :: as₁} {as₂} low₁≤�
     ⟦a⟧≤⁺high₁ = proj₂ $ proj₁ s₁
 
     high₁≤⁺high₂ : high₁ ≤⁺ high₂
-    high₁≤⁺high₂ = ≤⁺-transitive high₁≤⁺low₂ low₂≤⁺high₂
+    high₁≤⁺high₂ = TotalOrder.transitive ≤⁺-total-order high₁≤⁺low₂ low₂≤⁺high₂
     
 ≤?-total : ∀ {a₁ a₂ : A} → a₁ ≤? a₂ ≡ false → a₂ ≤? a₁ ≡ true
-≤?-total {a₁} {a₂} a₁≤?a₂≡false with ≤-total {a₁} {a₂}
+≤?-total {a₁} {a₂} a₁≤?a₂≡false with TotalOrder.total ≤-total-order {a₁} {a₂}
 ... | left  a₁≤a₂ = ⊥-elim contradiction
   where
     a₁≤?a₂≡true : a₁ ≤? a₂ ≡ true
-    a₁≤?a₂≡true = _↔_.from reflection a₁≤a₂
+    a₁≤?a₂≡true = _↔_.from ≤?-characteristic-function a₁≤a₂
 
     true≡a₁≤?a₂ : true ≡ a₁ ≤? a₂
     true≡a₁≤?a₂ = ≡-symmetric a₁≤?a₂≡true
@@ -97,13 +60,7 @@ Sorted-++ {low₁} {high₁} {low₂} {high₂} {a :: as₁} {as₂} low₁≤�
 
     contradiction : ⊥
     contradiction = true≢false true≡false
-... | right a₂≤a₁ = _↔_.from reflection a₂≤a₁
-
-⊤-left : ∀ {X : Set} → X → ⊤ × X
-⊤-left x = ⟨ ⊤.* , x ⟩
-
-⊤-right : ∀ {X : Set} → X → X × ⊤
-⊤-right x = ⟨ x , ⊤.* ⟩
+... | right a₂≤a₁ = _↔_.from ≤?-characteristic-function a₂≤a₁
 
 insert-preserves-sort : ∀ {low high : A⁺} {t : Tree A} {a : A} → low ≤⁺⟦ a ⟧≤⁺ high → Sorted low high t → Sorted low high (insert a t)
 insert-preserves-sort {low} {high} {empty} {a} low≤⁺⟦a⟧≤⁺high _ = low≤⁺⟦a⟧≤⁺high &
@@ -121,7 +78,7 @@ insert-preserves-sort {low} {high} {node l a' r} {a} ⟨ low≤⁺⟦a⟧ , ⟦a
   Sorted low high (node (insert a l) a' r)                                    ∎
   where
     a≤a' : a ≤ a'
-    a≤a' = _↔_.to reflection a≤?a'≡true
+    a≤a' = _↔_.to ≤?-characteristic-function a≤?a'≡true
 
     ⟦a⟧≤⁺⟦a'⟧ : ⟦ a ⟧ ≤⁺ ⟦ a' ⟧
     ⟦a⟧≤⁺⟦a'⟧ = ≤⁺-lift a≤a'
@@ -139,7 +96,7 @@ insert-preserves-sort {low} {high} {node l a' r} {a} ⟨ low≤⁺⟦a⟧ , ⟦a
     a'≤?a≡true = ≤?-total a≤?a'≡false
 
     a'≤a : a' ≤ a
-    a'≤a = _↔_.to reflection a'≤?a≡true
+    a'≤a = _↔_.to ≤?-characteristic-function a'≤?a≡true
 
     ⟦a'⟧≤⁺⟦a⟧ : ⟦ a' ⟧ ≤⁺ ⟦ a ⟧
     ⟦a'⟧≤⁺⟦a⟧ = ≤⁺-lift a'≤a
@@ -169,7 +126,7 @@ flatten-preserves-sort {low} {high} {node l a r} p = p &
     ⟦a⟧≤⁺high = proj₂ $ proj₁ $ proj₂ p
 
     ⟦a⟧≤⁺⟦a⟧ : ⟦ a ⟧ ≤⁺ ⟦ a ⟧
-    ⟦a⟧≤⁺⟦a⟧ = ≤⁺-lift ≤-reflexive
+    ⟦a⟧≤⁺⟦a⟧ = ≤⁺-lift $ total-order-reflexive ≤-total-order
     
 tree-sort-sorts : ∀ {as : List A} → Sorted -∞ ∞ (tree-sort as)
 tree-sort-sorts {as} = flatten-preserves-sort $ to-search-tree-sorted {as}
@@ -178,10 +135,10 @@ Sorted' : List A → Set
 Sorted' as = ∀ {i₁ i₂ : Fin (length as)} → i₁ ≤-Fin i₂ → lookup as i₁ ≤ lookup as i₂
 
 head-min : ∀ {as : List A} {a : A} {i : Fin (length (a :: as))} → Sorted -∞ ∞ (a :: as) → a ≤ lookup (a :: as) i
-head-min {[]} {_} {fzero} _ = ≤-reflexive
+head-min {[]} {_} {fzero} _ = total-order-reflexive ≤-total-order
 head-min {[]} {_} {fsucc ()}
-head-min {_ :: _} {_} {fzero} _ = ≤-reflexive
-head-min {a' :: as} {a} {fsucc i} s = ≤-transitive a≤a' $ head-min {as} {a'} {i} (weaken-low -∞-min Sorted-a'::as)
+head-min {_ :: _} {_} {fzero} _ = total-order-reflexive ≤-total-order
+head-min {a' :: as} {a} {fsucc i} s = TotalOrder.transitive ≤-total-order a≤a' $ head-min {as} {a'} {i} (weaken-low -∞-min Sorted-a'::as)
   where
     Sorted-a'::as : Sorted ⟦ a ⟧ ∞ (a' :: as)
     Sorted-a'::as = proj₂ s
