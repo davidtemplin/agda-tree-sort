@@ -20,28 +20,11 @@ open import Inspect using (inspect ; [_])
 open import List using (List ; _++_ ; length ; lookup); open List.List
 
 open import Product using (_×_ ; ⟨_,_⟩); open Product.∃
-import Sorted; module S = Sorted A _≤_ ≤-total-order; open S using (SortedT ; A⁺ ; -∞ ; ∞ ; ⟦_⟧ ; _≤⁺⟦_⟧≤⁺_ ; _≤⁺_ ; -∞≤⁺⟦a⟧≤⁺∞ ; weaken-low ; strengthen-low ; weaken-high ; ≤⁺-total-order) ; open S.SortedT ⦃...⦄ ; open S._≤⁺_
+import Sorted; module S = Sorted A _≤_ ≤-total-order; open S using (SortedT ; A⁺ ; -∞ ; ∞ ; ⟦_⟧ ; _≤⁺⟦_⟧≤⁺_ ; _≤⁺_ ; -∞≤⁺⟦a⟧≤⁺∞ ; weaken-low ; strengthen-low ; weaken-high ; ≤⁺-total-order ; Sorted-++ ; head-min) ; open S.SortedT ⦃...⦄ ; open S._≤⁺_
 open import Tree using (Tree); open Tree.Tree
 open import TreeSort A _≤?_ using (tree-sort ; to-search-tree ; insert ; flatten)
 open import Unit using (⊤)
 
-Sorted-++ : ∀ {low₁ high₁ low₂ high₂ : A⁺} {as₁ as₂ : List A} → low₁ ≤⁺ high₁ → high₁ ≤⁺ low₂ → low₂ ≤⁺ high₂ → Sorted low₁ high₁ as₁ → Sorted low₂ high₂ as₂ → Sorted low₁ high₂ (as₁ ++ as₂)
-Sorted-++ {low₁} {high₁} {low₂} {high₂} {[]} {as₂} low₁≤⁺high₁ high₁≤⁺low₂ low₂≤⁺high₂ s₁ s₂ = weaken-low (TotalOrder.transitive ≤⁺-total-order low₁≤⁺high₁ high₁≤⁺low₂) s₂
-Sorted-++ {low₁} {high₁} {low₂} {high₂} {a :: as₁} {as₂} low₁≤⁺high₁ high₁≤⁺low₂ low₂≤⁺high₂ s₁ s₂ = ⟨ s₁ , s₂ ⟩ &
-  Sorted low₁ high₁ (a :: as₁) × Sorted low₂ high₂ as₂                    →⟨ id ⟩
-  (low₁ ≤⁺⟦ a ⟧≤⁺ high₁ × Sorted ⟦ a ⟧ high₁ as₁) × Sorted low₂ high₂ as₂ →⟨ ×-assoc ⟩
-  low₁ ≤⁺⟦ a ⟧≤⁺ high₁ × Sorted ⟦ a ⟧ high₁ as₁ × Sorted low₂ high₂ as₂   →⟨ ×-cong id $ uncurry $ Sorted-++ ⟦a⟧≤⁺high₁ high₁≤⁺low₂ low₂≤⁺high₂ ⟩
-  low₁ ≤⁺⟦ a ⟧≤⁺ high₁ × Sorted ⟦ a ⟧ high₂ (as₁ ++ as₂)                  →⟨ ×-cong (weaken-high high₁≤⁺high₂) id ⟩
-  low₁ ≤⁺⟦ a ⟧≤⁺ high₂ × Sorted ⟦ a ⟧ high₂ (as₁ ++ as₂)                  →⟨ id ⟩
-  Sorted low₁ high₂ (a :: (as₁ ++ as₂))                                   →⟨ id ⟩
-  Sorted low₁ high₂ ((a :: as₁) ++ as₂)                                   ∎
-  where
-    ⟦a⟧≤⁺high₁ : ⟦ a ⟧ ≤⁺ high₁
-    ⟦a⟧≤⁺high₁ = proj₂ $ proj₁ s₁
-
-    high₁≤⁺high₂ : high₁ ≤⁺ high₂
-    high₁≤⁺high₂ = TotalOrder.transitive ≤⁺-total-order high₁≤⁺low₂ low₂≤⁺high₂
-    
 ≤?-total : ∀ {a₁ a₂ : A} → a₁ ≤? a₂ ≡ false → a₂ ≤? a₁ ≡ true
 ≤?-total {a₁} {a₂} a₁≤?a₂≡false with TotalOrder.total ≤-total-order {a₁} {a₂}
 ... | left  a₁≤a₂ = ⊥-elim contradiction
@@ -134,25 +117,10 @@ tree-sort-sorts {as} = flatten-preserves-sort $ to-search-tree-sorted {as}
 Sorted' : List A → Set
 Sorted' as = ∀ {i₁ i₂ : Fin (length as)} → i₁ ≤-Fin i₂ → lookup as i₁ ≤ lookup as i₂
 
-head-min : ∀ {as : List A} {a : A} {i : Fin (length (a :: as))} → Sorted -∞ ∞ (a :: as) → a ≤ lookup (a :: as) i
-head-min {[]} {_} {fzero} _ = total-order-reflexive ≤-total-order
-head-min {[]} {_} {fsucc ()}
-head-min {_ :: _} {_} {fzero} _ = total-order-reflexive ≤-total-order
-head-min {a' :: as} {a} {fsucc i} s = TotalOrder.transitive ≤-total-order a≤a' $ head-min {as} {a'} {i} (weaken-low -∞-min Sorted-a'::as)
-  where
-    Sorted-a'::as : Sorted ⟦ a ⟧ ∞ (a' :: as)
-    Sorted-a'::as = proj₂ s
-
-    extract : ⟦ a ⟧ ≤⁺ ⟦ a' ⟧ → a ≤ a'
-    extract (≤⁺-lift p) = p
-
-    a≤a' : a ≤ a'
-    a≤a' = extract $ proj₁ $ proj₁ $ proj₂ s
-
-Sound : ∀ {as : List A} → Sorted -∞ ∞ as → Sorted' as
-Sound {[]} _ ()
-Sound {a :: as} s (fzero-min {.(length as)} {i}) = head-min {as} {a} {i} s
-Sound {a :: as} ⟨ _ , s ⟩ (fsucc≤fsucc p) = Sound (weaken-low -∞-min s) p
+sound : ∀ {as : List A} → Sorted -∞ ∞ as → Sorted' as
+sound {[]} _ ()
+sound {a :: as} s (fzero-min {.(length as)} {i}) = head-min {as} {a} {i} s
+sound {a :: as} ⟨ _ , s ⟩ (fsucc≤fsucc p) = sound (weaken-low -∞-min s) p
 
 tree-sort-really-sorts : ∀ {as : List A} → Sorted' (tree-sort as)
-tree-sort-really-sorts {as} =  Sound $ tree-sort-sorts {as}
+tree-sort-really-sorts {as} = sound $ tree-sort-sorts {as}

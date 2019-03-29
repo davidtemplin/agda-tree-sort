@@ -5,10 +5,11 @@ open import Relation using (TotalOrder ; Reflexive ; total-order-reflexive)
 module Sorted (A : Set) (_≤_ : A → A → Set) (≤-total-order : TotalOrder _≤_) where
 
 open import Equality using (_≡_); open Equality._≡_
-open import Functions using (_$_ ; id)
-open import Implication using (_→⟨_⟩_ ; _∎ ; ×-cong)
-open import List using (List); open List.List
-open import Product using (_×_ ; ⟨_,_⟩)
+open import Fin using (Fin); open Fin.Fin
+open import Functions using (_$_ ; id ; _&_ ; uncurry)
+open import Implication using (_→⟨_⟩_ ; _∎ ; ×-cong ; ×-assoc)
+open import List using (List ; _++_ ; lookup ; length); open List.List
+open import Product using (_×_ ; ⟨_,_⟩); open Product.∃
 open import Sum using (_+_); open Sum._+_
 open import Tree using (Tree); open Tree.Tree
 open import Unit using (⊤)
@@ -90,3 +91,35 @@ strengthen-low ⟨ _ , ⟦a⟧≤⁺high ⟩ = ⟨ ≤⁺-lift $ total-order-ref
 
 weaken-high : ∀ {low high₁ high₂ : A⁺} {a : A} → high₁ ≤⁺ high₂ → low ≤⁺⟦ a ⟧≤⁺ high₁ → low ≤⁺⟦ a ⟧≤⁺ high₂
 weaken-high high₁≤⁺high₂ ⟨ low≤⁺⟦a⟧ , ⟦a⟧≤⁺high₁ ⟩ = ⟨ low≤⁺⟦a⟧ , TotalOrder.transitive ≤⁺-total-order ⟦a⟧≤⁺high₁ high₁≤⁺high₂ ⟩
+
+Sorted-++ : ∀ {low₁ high₁ low₂ high₂ : A⁺} {as₁ as₂ : List A} → low₁ ≤⁺ high₁ → high₁ ≤⁺ low₂ → low₂ ≤⁺ high₂ → Sorted low₁ high₁ as₁ → Sorted low₂ high₂ as₂ → Sorted low₁ high₂ (as₁ ++ as₂)
+Sorted-++ {low₁} {high₁} {low₂} {high₂} {[]} {as₂} low₁≤⁺high₁ high₁≤⁺low₂ low₂≤⁺high₂ s₁ s₂ = weaken-low (TotalOrder.transitive ≤⁺-total-order low₁≤⁺high₁ high₁≤⁺low₂) s₂
+Sorted-++ {low₁} {high₁} {low₂} {high₂} {a :: as₁} {as₂} low₁≤⁺high₁ high₁≤⁺low₂ low₂≤⁺high₂ s₁ s₂ = ⟨ s₁ , s₂ ⟩ &
+  Sorted low₁ high₁ (a :: as₁) × Sorted low₂ high₂ as₂                    →⟨ id ⟩
+  (low₁ ≤⁺⟦ a ⟧≤⁺ high₁ × Sorted ⟦ a ⟧ high₁ as₁) × Sorted low₂ high₂ as₂ →⟨ ×-assoc ⟩
+  low₁ ≤⁺⟦ a ⟧≤⁺ high₁ × Sorted ⟦ a ⟧ high₁ as₁ × Sorted low₂ high₂ as₂   →⟨ ×-cong id $ uncurry $ Sorted-++ ⟦a⟧≤⁺high₁ high₁≤⁺low₂ low₂≤⁺high₂ ⟩
+  low₁ ≤⁺⟦ a ⟧≤⁺ high₁ × Sorted ⟦ a ⟧ high₂ (as₁ ++ as₂)                  →⟨ ×-cong (weaken-high high₁≤⁺high₂) id ⟩
+  low₁ ≤⁺⟦ a ⟧≤⁺ high₂ × Sorted ⟦ a ⟧ high₂ (as₁ ++ as₂)                  →⟨ id ⟩
+  Sorted low₁ high₂ (a :: (as₁ ++ as₂))                                   →⟨ id ⟩
+  Sorted low₁ high₂ ((a :: as₁) ++ as₂)                                   ∎
+  where
+    ⟦a⟧≤⁺high₁ : ⟦ a ⟧ ≤⁺ high₁
+    ⟦a⟧≤⁺high₁ = proj₂ $ proj₁ s₁
+
+    high₁≤⁺high₂ : high₁ ≤⁺ high₂
+    high₁≤⁺high₂ = TotalOrder.transitive ≤⁺-total-order high₁≤⁺low₂ low₂≤⁺high₂
+
+head-min : ∀ {as : List A} {a : A} {i : Fin (length (a :: as))} → Sorted -∞ ∞ (a :: as) → a ≤ lookup (a :: as) i
+head-min {[]} {_} {fzero} _ = total-order-reflexive ≤-total-order
+head-min {[]} {_} {fsucc ()}
+head-min {_ :: _} {_} {fzero} _ = total-order-reflexive ≤-total-order
+head-min {a' :: as} {a} {fsucc i} s = TotalOrder.transitive ≤-total-order a≤a' $ head-min {as} {a'} {i} (weaken-low -∞-min Sorted-a'::as)
+  where
+    Sorted-a'::as : Sorted ⟦ a ⟧ ∞ (a' :: as)
+    Sorted-a'::as = proj₂ s
+
+    extract : ⟦ a ⟧ ≤⁺ ⟦ a' ⟧ → a ≤ a'
+    extract (≤⁺-lift p) = p
+
+    a≤a' : a ≤ a'
+    a≤a' = extract $ proj₁ $ proj₁ $ proj₂ s
